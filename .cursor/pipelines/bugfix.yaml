@@ -1,0 +1,31 @@
+name: bugfix
+description: Bug 修复工作流（集成 CE 插件）
+
+stages:
+  - name: brainstorm
+    label: Bug 分析
+    ce_skill: ce:brainstorm
+
+  - name: reproduce-test
+    label: 复现测试
+    skill: unit-test
+    mode: reproduce
+
+  - name: test-gate
+    label: "Gate: 复现确认"
+    gate: true
+    gate_description: "确认单测复现了问题"
+
+  - name: fix
+    label: 问题修复
+    skill: implement
+    mode: fix
+
+  - name: unit-test-pass
+    label: 单测通过
+    skill: unit-test
+    mode: verify
+
+  - name: archive
+    label: 归档
+    skill: archive

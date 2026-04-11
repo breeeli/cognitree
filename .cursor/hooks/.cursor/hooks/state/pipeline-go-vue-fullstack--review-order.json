@@ -1,0 +1,194 @@
+{
+  "pipeline_id": "go-vue-fullstack--review-order",
+  "_template_name": "go-vue-fullstack",
+  "change_name": "review-order",
+  "current_stage": "code-review",
+  "stages": [
+    {
+      "name": "explore",
+      "status": "skipped"
+    },
+    {
+      "name": "propose",
+      "status": "skipped"
+    },
+    {
+      "name": "review",
+      "status": "skipped"
+    },
+    {
+      "name": "gate-design",
+      "status": "completed",
+      "completed_at": "2026-04-07T01:26:10.895Z"
+    },
+    {
+      "name": "implement",
+      "status": "completed",
+      "started_at": "2026-04-07T01:26:10.898Z",
+      "completed_at": "2026-04-07T01:27:07.345Z",
+      "duration_ms": 56447
+    },
+    {
+      "name": "code-review",
+      "status": "completed",
+      "started_at": "2026-04-07T01:27:07.349Z",
+      "completed_at": "2026-04-07T01:30:03.655Z",
+      "duration_ms": 176306
+    },
+    {
+      "name": "gate-code",
+      "status": "completed",
+      "completed_at": "2026-04-07T01:47:44.070Z"
+    },
+    {
+      "name": "test-plan",
+      "status": "pending"
+    },
+    {
+      "name": "gate-test-plan",
+      "status": "pending"
+    },
+    {
+      "name": "qa-test",
+      "status": "pending"
+    },
+    {
+      "name": "gate-test",
+      "status": "pending"
+    },
+    {
+      "name": "archive",
+      "status": "pending"
+    }
+  ],
+  "active_agents": [],
+  "completed_agents": [
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "1m41s",
+      "duration_ms": 101447,
+      "completed_at": "2026-04-07T01:29:23.762Z",
+      "summary": "\n## 前端审查报告：评审会（review-meeting）模块\n\n**依据**：`frontend/AGENTS.md`（SFC 顺序、纯 JS、Element Plus、安全约束）  \n**范围**：`11086b7`、`adda9ae` 涉及的评审会相关文件当前工作区版本  \n**自动化**：对 `src/views/review-meeting/**/*.{vue,jsx}` 等执行了 E"
+    },
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "1m41s",
+      "duration_ms": 101671,
+      "completed_at": "2026-04-07T01:29:23.997Z",
+      "summary": "\n## 前端审查报告：评审会（review-meeting）模块\n\n**依据**：`frontend/AGENTS.md`（SFC 顺序、纯 JS、Element Plus、安全约束）  \n**范围**：`11086b7`、`adda9ae` 涉及的评审会相关文件当前工作区版本  \n**自动化**：对 `src/views/review-meeting/**/*.{vue,jsx}` 等执行了 E"
+    },
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "2m25s",
+      "duration_ms": 145855,
+      "completed_at": "2026-04-07T01:29:57.643Z",
+      "summary": "\n## 后端代码审查报告：`review_order` 模块\n\n**依据**：`backend/AGENTS.md`、`backend-api-convention` Skill、变更范围内源码（只读审查）。\n\n---\n\n### 自动化检查\n\n| 项 | 结果 |\n|----|------|\n| `golangci-lint`（仅 `./internal/api/review_order/...`"
+    },
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "2m26s",
+      "duration_ms": 146239,
+      "completed_at": "2026-04-07T01:29:58.058Z",
+      "summary": "\n## 后端代码审查报告：`review_order` 模块\n\n**依据**：`backend/AGENTS.md`、`backend-api-convention` Skill、变更范围内源码（只读审查）。\n\n---\n\n### 自动化检查\n\n| 项 | 结果 |\n|----|------|\n| `golangci-lint`（仅 `./internal/api/review_order/...`"
+    },
+    {
+      "type": "explore",
+      "status": "completed",
+      "duration": "1m26s",
+      "duration_ms": 86105,
+      "completed_at": "2026-04-07T06:31:32.509Z",
+      "summary": "\nHere is a consolidated picture of how the change-plan domain talks to KITSM.\n\n---\n\n## 1. State changes and KITSM (`plan_processor.go` + `plan_kitsm.go`)\n\n**Central hook:** `beforePlanReviewStateChang"
+    },
+    {
+      "type": "explore",
+      "status": "completed",
+      "duration": "1m26s",
+      "duration_ms": 86205,
+      "completed_at": "2026-04-07T06:31:32.728Z",
+      "summary": "\nHere is a consolidated picture of how the change-plan domain talks to KITSM.\n\n---\n\n## 1. State changes and KITSM (`plan_processor.go` + `plan_kitsm.go`)\n\n**Central hook:** `beforePlanReviewStateChang"
+    },
+    {
+      "type": "backend-implementer",
+      "status": "completed",
+      "duration": "1m28s",
+      "duration_ms": 88966,
+      "completed_at": "2026-04-07T06:31:39.970Z",
+      "summary": "\nHere is a concise report of what the repo contains. **`ReviewState` is not in `review_order.go`**; it lives in the same package in `enums.go`, so both are included below.\n\n---\n\n## 1. `backend/interna"
+    },
+    {
+      "type": "backend-implementer",
+      "status": "completed",
+      "duration": "1m29s",
+      "duration_ms": 89323,
+      "completed_at": "2026-04-07T06:31:40.293Z",
+      "summary": "\nHere is a concise report of what the repo contains. **`ReviewState` is not in `review_order.go`**; it lives in the same package in `enums.go`, so both are included below.\n\n---\n\n## 1. `backend/interna"
+    },
+    {
+      "type": "backend-implementer",
+      "status": "completed",
+      "duration": "0s",
+      "duration_ms": 32,
+      "completed_at": "2026-04-07T17:18:13.354Z",
+      "summary": ""
+    },
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "0s",
+      "duration_ms": 61,
+      "completed_at": "2026-04-07T17:32:28.144Z",
+      "summary": ""
+    },
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "0s",
+      "duration_ms": 24,
+      "completed_at": "2026-04-07T17:32:28.197Z",
+      "summary": ""
+    },
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "0s",
+      "duration_ms": 64,
+      "completed_at": "2026-04-07T21:36:17.888Z",
+      "summary": ""
+    },
+    {
+      "type": "code-reviewer",
+      "status": "completed",
+      "duration": "0s",
+      "duration_ms": 27,
+      "completed_at": "2026-04-07T21:36:17.942Z",
+      "summary": ""
+    }
+  ],
+  "gates": [
+    {
+      "name": "gate-design",
+      "result": "passed",
+      "decided_at": "2026-04-07T01:26:10.895Z"
+    },
+    {
+      "name": "gate-code",
+      "result": "passed",
+      "decided_at": "2026-04-07T01:47:44.070Z"
+    },
+    {
+      "name": "gate-test-plan",
+      "result": "pending"
+    },
+    {
+      "name": "gate-test",
+      "result": "pending"
+    }
+  ],
+  "started_at": "2026-04-07T01:25:59.818Z",
+  "last_checkpoint": "2026-04-07T21:36:28.203Z",
+  "last_status": "completed"
+}

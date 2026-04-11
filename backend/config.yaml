@@ -1,0 +1,19 @@
+server:
+  port: 8089
+
+database:
+  host: localhost
+  port: 5432
+  user: cognitree
+  password: "CHANGE_ME"
+  dbname: cognitree
+  sslmode: disable
+
+log:
+  level: debug
+
+ai:
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  api_key: "CHANGE_ME"
+  model: "tongyi-xiaomi-analysis-pro"
+  max_tokens: 2000

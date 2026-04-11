@@ -27,6 +27,18 @@ go.work.sum
 # env file
 .env
 
+# frontend
+frontend/node_modules/
+frontend/dist/
+frontend/*.log
+
+# local runtimes / temp artifacts
+.node-linux/
+.embedded-pg/
+
+# backend logs
+backend/*.log
+
 # Editor/IDE
 # .idea/
 # .vscode/

@@ -1,0 +1,26 @@
+---
+description: 通用项目规则。操作代码前先读取 AGENTS.md 了解工作流和目录结构。
+globs:
+alwaysApply: true
+---
+
+# 项目规则
+
+## 工作流
+
+本项目使用两种工作流管理需求：
+
+- **Feature**: brainstorm -> design-gate -> plan -> plan-gate -> implement -> code-review -> code-gate -> unit-test -> test-plan-gate -> e2e-test -> test-gate -> archive
+- **Bugfix**: brainstorm -> reproduce-test -> test-gate -> fix -> unit-test-pass -> archive
+
+使用 `/req-dev` 命令启动需求，使用 `/optimize-flow` 命令沉淀知识。
+
+## 知识检索
+
+执行任何阶段前，先检索相关知识：
+- `context/` — 业务/技术/经验知识库
+- `docs/solutions/` — 技术问题解决方案（CE 插件管理）
+
+## 产出物管理
+
+每个阶段的产出物存放在 `requirements/<req-id>/` 目录下，归档后移动到 `requirements/completed/`。

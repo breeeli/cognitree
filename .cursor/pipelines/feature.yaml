@@ -1,0 +1,56 @@
+name: feature
+description: 通用功能开发工作流（集成 CE 插件）
+
+stages:
+  - name: brainstorm
+    label: 需求分析
+    ce_skill: ce:brainstorm
+
+  - name: design-gate
+    label: "Gate: 需求确认"
+    gate: true
+    gate_description: "确认需求方向和范围"
+
+  - name: plan
+    label: 技术规划
+    ce_skill: ce:plan
+
+  - name: plan-gate
+    label: "Gate: 方案确认"
+    gate: true
+    gate_description: "确认技术方案和实现路径"
+
+  - name: implement
+    label: 代码实现
+    skill: implement
+
+  - name: code-review
+    label: 代码审查
+    ce_skill: ce:review
+
+  - name: code-gate
+    label: "Gate: 代码质量"
+    gate: true
+    gate_description: "确认代码审查结果"
+
+  - name: unit-test
+    label: 单元测试
+    skill: unit-test
+
+  - name: test-plan-gate
+    label: "Gate: 测试计划"
+    gate: true
+    gate_description: "确认测试覆盖充分"
+
+  - name: e2e-test
+    label: E2E 测试
+    skill: e2e-test
+
+  - name: test-gate
+    label: "Gate: 测试结果"
+    gate: true
+    gate_description: "确认测试结果"
+
+  - name: archive
+    label: 归档
+    skill: archive

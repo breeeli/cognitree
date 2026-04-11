@@ -1,0 +1,95 @@
+{
+  "pipeline_id": "feature--feat-20260409-init-fullstack",
+  "_template_name": "feature",
+  "change_name": "feat-20260409-init-fullstack",
+  "current_stage": "implement",
+  "stages": [
+    {
+      "name": "brainstorm",
+      "status": "completed",
+      "completed_at": "2026-04-09T03:52:53.516Z"
+    },
+    {
+      "name": "design-gate",
+      "status": "completed",
+      "completed_at": "2026-04-09T03:52:53.520Z"
+    },
+    {
+      "name": "plan",
+      "status": "completed",
+      "started_at": "2026-04-09T03:52:53.523Z",
+      "completed_at": "2026-04-09T04:00:43.706Z",
+      "duration_ms": 470183
+    },
+    {
+      "name": "plan-gate",
+      "status": "completed",
+      "completed_at": "2026-04-09T04:00:43.710Z"
+    },
+    {
+      "name": "implement",
+      "status": "completed",
+      "started_at": "2026-04-09T04:00:43.713Z",
+      "completed_at": "2026-04-09T04:13:39.037Z",
+      "duration_ms": 775324
+    },
+    {
+      "name": "code-review",
+      "status": "skipped"
+    },
+    {
+      "name": "code-gate",
+      "status": "skipped"
+    },
+    {
+      "name": "unit-test",
+      "status": "skipped"
+    },
+    {
+      "name": "test-plan-gate",
+      "status": "skipped"
+    },
+    {
+      "name": "e2e-test",
+      "status": "skipped"
+    },
+    {
+      "name": "test-gate",
+      "status": "skipped"
+    },
+    {
+      "name": "archive",
+      "status": "completed",
+      "completed_at": "2026-04-09T05:58:39.894Z"
+    }
+  ],
+  "active_agents": [],
+  "completed_agents": [],
+  "gates": [
+    {
+      "name": "design-gate",
+      "result": "passed",
+      "decided_at": "2026-04-09T03:52:53.520Z"
+    },
+    {
+      "name": "plan-gate",
+      "result": "passed",
+      "decided_at": "2026-04-09T04:00:43.710Z"
+    },
+    {
+      "name": "code-gate",
+      "result": "pending"
+    },
+    {
+      "name": "test-plan-gate",
+      "result": "pending"
+    },
+    {
+      "name": "test-gate",
+      "result": "pending"
+    }
+  ],
+  "started_at": "2026-04-09T03:52:46.514Z",
+  "last_checkpoint": "2026-04-09T09:41:17.006Z",
+  "last_status": "aborted"
+}
