@@ -3,7 +3,7 @@
 - ID: `feat-20260412-summary-layer`
 - 类型: `Feature`
 - 创建时间: `2026-04-12 15:30`
-- 当前阶段: `design-gate`
+- 当前阶段: `plan-gate`
 - 状态: `in-progress`
 
 ## 原始需求
@@ -18,12 +18,20 @@
 
 ## 已确认方向
 
-- summary 先同时覆盖节点摘要和子树摘要
+- summary 同时覆盖节点摘要、路径摘要和子树摘要
 - 继续沿用 `collect -> select -> format` 的分层结构
 - 先把 summary 注册进 `collect` 阶段，后续再一起验证效果
 - summary 采用异步生成
 - summary 先完全由模型生成，不做人工编辑入口
-- summary 缺失时在 context 中可以完全忽略，不强行占位
+- summary 生成失败需要重试和补偿
+- summary 缺失时可以完全忽略，但要记录一次可观测事件
+
+## Gate 记录
+
+### Gate: design-gate - 2026-04-12 15:30
+
+- 结果: 通过
+- 备注: summary 先覆盖节点摘要、路径摘要和子树摘要，按 `collect -> select -> format` 分层推进；异步生成、模型直出、失败重试补偿、缺失可观测事件作为前置约束。
 
 ## 当前产物
 

@@ -6,32 +6,33 @@
 
 ## 已确认约束
 
-- summary 先覆盖节点摘要和子树摘要
+- summary 同时覆盖节点摘要、路径摘要和子树摘要
 - 继续沿用 `collect -> select -> format` 的分层结构
 - 先把 summary 注册到 `collect`
 - summary 采用异步生成
 - summary 完全由模型生成
-- summary 缺失时可以完全忽略，不做 prompt 占位
+- summary 生成失败需要重试和补偿
+- summary 缺失时可以完全忽略，但要记录一次可观测事件
 
 ## 分阶段
 
 ### Phase 1: 定义 summary 数据和边界
 
 - 确认 summary 的数据模型
-- 明确节点摘要和子树摘要的职责
-- 说明 summary 的消费边界
+- 明确节点摘要、路径摘要和子树摘要的职责
+- 说明 summary 的消费边界和缺失可观测事件
 
 ### Phase 2: 设计异步生成链路
 
 - 定义 summary 异步任务的触发时机
-- 定义失败重试和幂等策略
+- 定义失败重试、补偿和幂等策略
 - 定义模型生成结果的落库路径
 
 ### Phase 3: 接入 collect
 
 - 把 summary 注册进 `collect`
 - 让 `select` 阶段可以读取摘要
-- 保持缺失时完全忽略的策略
+- 保持缺失时完全忽略但记录事件的策略
 
 ### Phase 4: 接入 format
 
@@ -44,3 +45,4 @@
 - summary 不再只是空字段
 - context-builder 能读取 summary
 - summary 缺失时不会影响聊天链路
+- summary 缺失会留下可观测事件
