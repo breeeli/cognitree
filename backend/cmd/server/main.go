@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -47,13 +48,16 @@ func main() {
 	qaPairRepo := persistrepo.NewQAPairRepository(db)
 	blockRepo := persistrepo.NewBlockRepository(db)
 	anchorRepo := persistrepo.NewAnchorRepository(db)
+	summaryRepo := persistrepo.NewSummaryRepository(db)
 
 	treeSvc := appservice.NewTreeService(treeRepo, nodeRepo)
 	nodeSvc := appservice.NewNodeService(nodeRepo, qaPairRepo, blockRepo, anchorRepo)
 
 	aiClient := ai.NewOpenAIClient(cfg.AI)
-	contextBuilder := ai.NewContextBuilder(treeRepo, nodeRepo, qaPairRepo, blockRepo, anchorRepo)
-	chatSvc := appservice.NewChatService(nodeRepo, qaPairRepo, blockRepo, contextBuilder, aiClient)
+	contextBuilder := ai.NewContextBuilder(treeRepo, nodeRepo, qaPairRepo, blockRepo, anchorRepo, summaryRepo)
+	summarySvc := appservice.NewSummaryService(treeRepo, nodeRepo, qaPairRepo, blockRepo, summaryRepo, aiClient)
+	summarySvc.Start(context.Background())
+	chatSvc := appservice.NewChatService(nodeRepo, qaPairRepo, blockRepo, contextBuilder, aiClient, summarySvc)
 
 	r := router.Setup(router.Deps{
 		DB:      db,

@@ -3,7 +3,7 @@
 - ID: `feat-20260412-summary-layer`
 - 类型: `Feature`
 - 创建时间: `2026-04-12 15:30`
-- 当前阶段: `plan-gate`
+- 当前阶段: `implementation-gate`
 - 状态: `in-progress`
 
 ## 原始需求
@@ -32,6 +32,11 @@
 
 - 结果: 通过
 - 备注: summary 先覆盖节点摘要、路径摘要和子树摘要，按 `collect -> select -> format` 分层推进；异步生成、模型直出、失败重试补偿、缺失可观测事件作为前置约束。
+
+### Gate: plan-gate - 2026-04-12 16:10
+
+- 结果: 通过
+- 备注: summary 已拆成数据模型、异步生成、collect 接入、format 接入和测试五个实现任务，开始进入代码落地阶段。
 
 ## 当前产物
 

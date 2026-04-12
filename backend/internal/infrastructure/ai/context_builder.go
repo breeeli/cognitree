@@ -9,6 +9,7 @@ import (
 	"github.com/cognitree/backend/internal/domain/entity"
 	"github.com/cognitree/backend/internal/domain/repository"
 	domainservice "github.com/cognitree/backend/internal/domain/service"
+	"github.com/cognitree/backend/pkg/logger"
 )
 
 type contextBuilder struct {
@@ -32,6 +33,7 @@ func NewContextBuilder(
 	qaPairRepo repository.QAPairRepository,
 	blockRepo repository.BlockRepository,
 	anchorRepo repository.AnchorRepository,
+	summaryRepo repository.SummaryRepository,
 ) domainservice.ContextBuilder {
 	return &contextBuilder{
 		treeRepo:        treeRepo,
@@ -39,7 +41,7 @@ func NewContextBuilder(
 		qaPairRepo:      qaPairRepo,
 		blockRepo:       blockRepo,
 		anchorRepo:      anchorRepo,
-		summaryProvider: newNoopSummaryProvider(),
+		summaryProvider: newRepositorySummaryProvider(summaryRepo),
 	}
 }
 
@@ -85,16 +87,17 @@ func (b *contextBuilder) BuildContext(ctx context.Context, treeID string, curren
 	anchorEvidence, anchorWarnings := b.collectAnchorEvidence(ctx, currentNode, nodeMap)
 	warnings = append(warnings, anchorWarnings...)
 
-	siblingSummaries, relevantSummaries, summaryWarnings := b.collectSummarySections(ctx, currentNodeID, newQuestion)
+	nodeSummary, pathSummary, subtreeSummary, summaryWarnings := b.collectSummarySections(ctx, currentNodeID)
 	warnings = append(warnings, summaryWarnings...)
 
 	sections := b.selectSections([]contextSection{
 		{priority: 1, title: "Tree Goal", content: treeGoal},
 		{priority: 2, title: "Anchor Evidence", content: anchorEvidence},
 		{priority: 3, title: "Current Path", content: threadDetail},
-		{priority: 4, title: "Tree Overview", content: treeOverview},
-		{priority: 5, title: "Sibling Summaries", content: siblingSummaries},
-		{priority: 6, title: "Related Summaries", content: relevantSummaries},
+		{priority: 4, title: "Node Summary", content: nodeSummary},
+		{priority: 5, title: "Path Summary", content: pathSummary},
+		{priority: 6, title: "Subtree Summary", content: subtreeSummary},
+		{priority: 7, title: "Tree Overview", content: treeOverview},
 		{priority: 99, title: "Current Ask", content: strings.TrimSpace(newQuestion)},
 	})
 
@@ -200,46 +203,40 @@ func (b *contextBuilder) collectAnchorEvidence(ctx context.Context, currentNode 
 	return strings.Join(lines, "\n"), nil
 }
 
-func (b *contextBuilder) collectSummarySections(ctx context.Context, currentNodeID string, question string) (string, string, []string) {
+func (b *contextBuilder) collectSummarySections(ctx context.Context, currentNodeID string) (string, string, string, []string) {
 	warnings := make([]string, 0)
 
-	nodeSummary, err := b.summaryProvider.GetNodeSummary(ctx, currentNodeID)
+	nodeSummary, found, err := b.summaryProvider.GetNodeSummary(ctx, currentNodeID)
 	if err != nil {
 		warnings = append(warnings, fmt.Sprintf("summary degraded: node summary unavailable: %v", err))
+	} else if !found {
+		logMissingSummary("node", currentNodeID)
 	}
 
-	siblingSummaries, err := b.summaryProvider.GetSiblingSummaries(ctx, currentNodeID)
+	pathSummary, found, err := b.summaryProvider.GetPathSummary(ctx, currentNodeID)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("summary degraded: sibling summaries unavailable: %v", err))
+		warnings = append(warnings, fmt.Sprintf("summary degraded: path summary unavailable: %v", err))
+	} else if !found {
+		logMissingSummary("path", currentNodeID)
 	}
 
-	relevantSummaries, err := b.summaryProvider.GetRelevantSummaries(ctx, currentNodeID, question)
+	subtreeSummary, found, err := b.summaryProvider.GetSubtreeSummary(ctx, currentNodeID)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("summary degraded: relevant summaries unavailable: %v", err))
+		warnings = append(warnings, fmt.Sprintf("summary degraded: subtree summary unavailable: %v", err))
+	} else if !found {
+		logMissingSummary("subtree", currentNodeID)
 	}
 
-	if strings.TrimSpace(nodeSummary) != "" {
-		relevantSummaries = append([]string{"Current Node Summary: " + strings.TrimSpace(nodeSummary)}, relevantSummaries...)
-	}
-
-	return formatSummaryList(siblingSummaries), formatSummaryList(relevantSummaries), warnings
+	return strings.TrimSpace(nodeSummary), strings.TrimSpace(pathSummary), strings.TrimSpace(subtreeSummary), warnings
 }
 
-func formatSummaryList(items []string) string {
-	if len(items) == 0 {
-		return ""
+func logMissingSummary(scope string, nodeID string) {
+	if logger.L != nil {
+		logger.L.Infow("summary missing",
+			"scope", scope,
+			"node_id", nodeID,
+		)
 	}
-
-	lines := make([]string, 0, len(items))
-	for _, item := range items {
-		item = strings.TrimSpace(item)
-		if item == "" {
-			continue
-		}
-		lines = append(lines, "- "+item)
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 func (b *contextBuilder) selectSections(sections []contextSection) []contextSection {

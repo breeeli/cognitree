@@ -262,6 +262,96 @@ func TestBuildContextMarksAnchorDegradation(t *testing.T) {
 	assertContains(t, payload.UserPrompt, "## Anchor Evidence")
 }
 
+func TestBuildContextIncludesSummarySections(t *testing.T) {
+	root := &entity.Node{
+		ID:       "root",
+		TreeID:   "tree-1",
+		Question: "Root question",
+		Status:   entity.NodeStatusAnswered,
+	}
+	child := &entity.Node{
+		ID:           "child",
+		TreeID:       "tree-1",
+		ParentNodeID: &root.ID,
+		Question:     "Child question",
+		Status:       entity.NodeStatusDraft,
+	}
+
+	builder := &contextBuilder{
+		treeRepo: stubTreeRepository{
+			getByID: func(context.Context, string) (*entity.Tree, error) {
+				return &entity.Tree{ID: "tree-1", Title: "Goal title"}, nil
+			},
+		},
+		nodeRepo: stubNodeRepository{
+			getByTreeID: func(context.Context, string) ([]*entity.Node, error) {
+				return []*entity.Node{root, child}, nil
+			},
+		},
+		qaPairRepo: stubQAPairRepository{
+			getByNodeID: func(context.Context, string) ([]*entity.QAPair, error) {
+				return []*entity.QAPair{}, nil
+			},
+		},
+		blockRepo:       stubBlockRepository{},
+		anchorRepo:      stubAnchorRepository{},
+		summaryProvider: stubSummaryProvider{nodeSummary: "Node summary", pathSummary: "Path summary", subtreeSummary: "Subtree summary"},
+	}
+
+	payload, err := builder.BuildContext(context.Background(), "tree-1", "child", "How do summaries work?")
+	if err != nil {
+		t.Fatalf("BuildContext returned error: %v", err)
+	}
+
+	assertContains(t, payload.UserPrompt, "## Node Summary")
+	assertContains(t, payload.UserPrompt, "Node summary")
+	assertContains(t, payload.UserPrompt, "## Path Summary")
+	assertContains(t, payload.UserPrompt, "Path summary")
+	assertContains(t, payload.UserPrompt, "## Subtree Summary")
+	assertContains(t, payload.UserPrompt, "Subtree summary")
+}
+
+func TestBuildContextMarksSummaryDegradation(t *testing.T) {
+	root := &entity.Node{
+		ID:       "root",
+		TreeID:   "tree-1",
+		Question: "Root question",
+		Status:   entity.NodeStatusAnswered,
+	}
+
+	builder := &contextBuilder{
+		treeRepo: stubTreeRepository{
+			getByID: func(context.Context, string) (*entity.Tree, error) {
+				return &entity.Tree{ID: "tree-1", Title: "Goal title"}, nil
+			},
+		},
+		nodeRepo: stubNodeRepository{
+			getByTreeID: func(context.Context, string) ([]*entity.Node, error) {
+				return []*entity.Node{root}, nil
+			},
+		},
+		qaPairRepo:      stubQAPairRepository{},
+		blockRepo:       stubBlockRepository{},
+		anchorRepo:      stubAnchorRepository{},
+		summaryProvider: stubSummaryProvider{nodeErr: errors.New("node summary unavailable"), pathErr: errors.New("path summary unavailable"), subtreeErr: errors.New("subtree summary unavailable")},
+	}
+
+	payload, err := builder.BuildContext(context.Background(), "tree-1", "root", "How should missing summaries behave?")
+	if err != nil {
+		t.Fatalf("BuildContext returned error: %v", err)
+	}
+
+	if !payload.Degraded {
+		t.Fatalf("expected degraded payload")
+	}
+	assertContains(t, strings.Join(payload.Warnings, "\n"), "summary degraded: node summary unavailable")
+	assertContains(t, strings.Join(payload.Warnings, "\n"), "summary degraded: path summary unavailable")
+	assertContains(t, strings.Join(payload.Warnings, "\n"), "summary degraded: subtree summary unavailable")
+	if strings.Contains(payload.UserPrompt, "## Node Summary") || strings.Contains(payload.UserPrompt, "## Path Summary") || strings.Contains(payload.UserPrompt, "## Subtree Summary") {
+		t.Fatalf("expected missing summaries to be omitted from prompt, got %s", payload.UserPrompt)
+	}
+}
+
 func TestBuildContextFailsWhenCurrentNodeMissingFromTree(t *testing.T) {
 	root := &entity.Node{
 		ID:       "root",
@@ -407,3 +497,24 @@ func (s stubAnchorRepository) GetByBlockID(context.Context, string) ([]*entity.A
 	return nil, nil
 }
 func (s stubAnchorRepository) DeleteByNodeID(context.Context, string) error { return nil }
+
+type stubSummaryProvider struct {
+	nodeSummary    string
+	pathSummary    string
+	subtreeSummary string
+	nodeErr        error
+	pathErr        error
+	subtreeErr     error
+}
+
+func (s stubSummaryProvider) GetNodeSummary(context.Context, string) (string, bool, error) {
+	return s.nodeSummary, s.nodeErr == nil, s.nodeErr
+}
+
+func (s stubSummaryProvider) GetPathSummary(context.Context, string) (string, bool, error) {
+	return s.pathSummary, s.pathErr == nil, s.pathErr
+}
+
+func (s stubSummaryProvider) GetSubtreeSummary(context.Context, string) (string, bool, error) {
+	return s.subtreeSummary, s.subtreeErr == nil, s.subtreeErr
+}

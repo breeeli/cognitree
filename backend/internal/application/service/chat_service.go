@@ -16,11 +16,12 @@ type AIClient interface {
 }
 
 type ChatService struct {
-	nodeRepo       repository.NodeRepository
-	qaPairRepo     repository.QAPairRepository
-	blockRepo      repository.BlockRepository
-	contextBuilder domainservice.ContextBuilder
-	aiClient       AIClient
+	nodeRepo          repository.NodeRepository
+	qaPairRepo        repository.QAPairRepository
+	blockRepo         repository.BlockRepository
+	contextBuilder    domainservice.ContextBuilder
+	aiClient          AIClient
+	summaryDispatcher SummaryDispatcher
 }
 
 func NewChatService(
@@ -29,13 +30,15 @@ func NewChatService(
 	blockRepo repository.BlockRepository,
 	contextBuilder domainservice.ContextBuilder,
 	aiClient AIClient,
+	summaryDispatcher SummaryDispatcher,
 ) *ChatService {
 	return &ChatService{
-		nodeRepo:       nodeRepo,
-		qaPairRepo:     qaPairRepo,
-		blockRepo:      blockRepo,
-		contextBuilder: contextBuilder,
-		aiClient:       aiClient,
+		nodeRepo:          nodeRepo,
+		qaPairRepo:        qaPairRepo,
+		blockRepo:         blockRepo,
+		contextBuilder:    contextBuilder,
+		aiClient:          aiClient,
+		summaryDispatcher: summaryDispatcher,
 	}
 }
 
@@ -84,6 +87,10 @@ func (s *ChatService) Chat(ctx context.Context, nodeID string, req dto.ChatReque
 		if err := s.nodeRepo.Update(ctx, node); err != nil {
 			return nil, fmt.Errorf("update node status: %w", err)
 		}
+	}
+
+	if s.summaryDispatcher != nil {
+		s.summaryDispatcher.EnqueueForNode(node.TreeID, nodeID)
 	}
 
 	return &dto.ChatResponse{
