@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/cognitree/backend/internal/domain/entity"
@@ -11,20 +12,34 @@ import (
 )
 
 type contextBuilder struct {
-	nodeRepo   repository.NodeRepository
-	qaPairRepo repository.QAPairRepository
-	blockRepo  repository.BlockRepository
+	treeRepo        repository.TreeRepository
+	nodeRepo        repository.NodeRepository
+	qaPairRepo      repository.QAPairRepository
+	blockRepo       repository.BlockRepository
+	anchorRepo      repository.AnchorRepository
+	summaryProvider summaryProvider
+}
+
+type contextSection struct {
+	priority int
+	title    string
+	content  string
 }
 
 func NewContextBuilder(
+	treeRepo repository.TreeRepository,
 	nodeRepo repository.NodeRepository,
 	qaPairRepo repository.QAPairRepository,
 	blockRepo repository.BlockRepository,
+	anchorRepo repository.AnchorRepository,
 ) domainservice.ContextBuilder {
 	return &contextBuilder{
-		nodeRepo:   nodeRepo,
-		qaPairRepo: qaPairRepo,
-		blockRepo:  blockRepo,
+		treeRepo:        treeRepo,
+		nodeRepo:        nodeRepo,
+		qaPairRepo:      qaPairRepo,
+		blockRepo:       blockRepo,
+		anchorRepo:      anchorRepo,
+		summaryProvider: newNoopSummaryProvider(),
 	}
 }
 
@@ -42,85 +57,263 @@ func (b *contextBuilder) BuildContext(ctx context.Context, treeID string, curren
 		nodeMap[n.ID] = n
 		if n.ParentNodeID == nil {
 			rootNode = n
-		} else {
-			childrenMap[*n.ParentNodeID] = append(childrenMap[*n.ParentNodeID], n)
+			continue
 		}
+		childrenMap[*n.ParentNodeID] = append(childrenMap[*n.ParentNodeID], n)
 	}
 
 	if rootNode == nil {
 		return nil, fmt.Errorf("root node not found")
 	}
 
-	thread := b.buildThread(nodeMap, currentNodeID)
-
-	var treeOverview strings.Builder
-	b.renderTreeOverview(&treeOverview, rootNode, childrenMap, 0, currentNodeID)
-
-	var threadDetail strings.Builder
-	for _, n := range thread {
-		qaPairs, err := b.qaPairRepo.GetByNodeID(ctx, n.ID)
-		if err != nil {
-			continue
-		}
-		threadDetail.WriteString(fmt.Sprintf("\n### 节点: %s\n", n.Question))
-		for _, qp := range qaPairs {
-			threadDetail.WriteString(fmt.Sprintf("\n**问**: %s\n", qp.Question))
-			blocks, err := b.blockRepo.GetByQAPairID(ctx, qp.ID)
-			if err != nil {
-				continue
-			}
-			for _, block := range blocks {
-				threadDetail.WriteString(fmt.Sprintf("**答**: %s\n", block.Content))
-			}
-		}
+	thread, err := b.buildThread(nodeMap, currentNodeID)
+	if err != nil {
+		return nil, fmt.Errorf("build thread: %w", err)
 	}
 
-	systemPrompt := `你是一个知识探索助手，正在帮助用户在一棵"思维树"上深入探索问题。
+	currentNode := thread[len(thread)-1]
+	warnings := make([]string, 0)
 
-思维树是一种树状知识结构，每个节点代表一个思考主题，节点内可以有多轮问答。用户通过在节点上提问来深入探索，也可以从回答中选取片段展开子问题。
+	treeGoal, treeWarnings := b.collectTreeGoal(ctx, treeID, rootNode)
+	warnings = append(warnings, treeWarnings...)
 
-你的回答应该：
-1. 紧密围绕当前节点的主题
-2. 考虑整棵树的上下文（用户的探索路径和已有知识）
-3. 结构清晰，使用 Markdown 格式
-4. 适当引导用户可以继续深入的方向`
+	treeOverview := b.collectTreeOverview(rootNode, childrenMap, currentNodeID)
 
-	var userPrompt strings.Builder
-	userPrompt.WriteString("## 思维树结构概览\n\n")
-	userPrompt.WriteString(treeOverview.String())
-	userPrompt.WriteString("\n\n## 当前探索路径（从根到当前节点）\n")
-	userPrompt.WriteString(threadDetail.String())
-	userPrompt.WriteString(fmt.Sprintf("\n\n## 当前问题\n\n%s", newQuestion))
+	threadDetail, threadWarnings := b.collectThreadDetail(ctx, thread)
+	warnings = append(warnings, threadWarnings...)
+
+	anchorEvidence, anchorWarnings := b.collectAnchorEvidence(ctx, currentNode, nodeMap)
+	warnings = append(warnings, anchorWarnings...)
+
+	siblingSummaries, relevantSummaries, summaryWarnings := b.collectSummarySections(ctx, currentNodeID, newQuestion)
+	warnings = append(warnings, summaryWarnings...)
+
+	sections := b.selectSections([]contextSection{
+		{priority: 1, title: "Tree Goal", content: treeGoal},
+		{priority: 2, title: "Anchor Evidence", content: anchorEvidence},
+		{priority: 3, title: "Current Path", content: threadDetail},
+		{priority: 4, title: "Tree Overview", content: treeOverview},
+		{priority: 5, title: "Sibling Summaries", content: siblingSummaries},
+		{priority: 6, title: "Related Summaries", content: relevantSummaries},
+		{priority: 99, title: "Current Ask", content: strings.TrimSpace(newQuestion)},
+	})
 
 	return &domainservice.ContextPayload{
-		SystemPrompt: systemPrompt,
-		UserPrompt:   userPrompt.String(),
+		SystemPrompt: b.formatSystemPrompt(),
+		UserPrompt:   b.formatUserPrompt(sections),
+		Degraded:     len(warnings) > 0,
+		Warnings:     warnings,
 	}, nil
 }
 
-func (b *contextBuilder) buildThread(nodeMap map[string]*entity.Node, currentNodeID string) []*entity.Node {
+func (b *contextBuilder) collectTreeGoal(ctx context.Context, treeID string, rootNode *entity.Node) (string, []string) {
+	tree, err := b.treeRepo.GetByID(ctx, treeID)
+	if err != nil {
+		return fmt.Sprintf("- Root Question: %s", rootNode.Question), []string{
+			fmt.Sprintf("tree goal degraded: %v", err),
+		}
+	}
+
+	lines := make([]string, 0, 3)
+	if title := strings.TrimSpace(tree.Title); title != "" {
+		lines = append(lines, fmt.Sprintf("- Title: %s", title))
+	}
+	if description := strings.TrimSpace(tree.Description); description != "" {
+		lines = append(lines, fmt.Sprintf("- Description: %s", description))
+	}
+	lines = append(lines, fmt.Sprintf("- Root Question: %s", rootNode.Question))
+
+	return strings.Join(lines, "\n"), nil
+}
+
+func (b *contextBuilder) collectTreeOverview(rootNode *entity.Node, childrenMap map[string][]*entity.Node, currentNodeID string) string {
+	var sb strings.Builder
+	b.renderTreeOverview(&sb, rootNode, childrenMap, 0, currentNodeID)
+	return strings.TrimSpace(sb.String())
+}
+
+func (b *contextBuilder) collectThreadDetail(ctx context.Context, thread []*entity.Node) (string, []string) {
+	var sb strings.Builder
+	warnings := make([]string, 0)
+
+	for _, n := range thread {
+		sb.WriteString(fmt.Sprintf("### Node: %s\n", n.Question))
+
+		qaPairs, err := b.qaPairRepo.GetByNodeID(ctx, n.ID)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("thread degraded: node %s qa_pairs unavailable: %v", n.ID, err))
+			sb.WriteString("- [Q&A omitted due to context degradation]\n\n")
+			continue
+		}
+
+		if len(qaPairs) == 0 {
+			sb.WriteString("- No historical Q&A yet.\n\n")
+			continue
+		}
+
+		for _, qp := range qaPairs {
+			sb.WriteString(fmt.Sprintf("**Q:** %s\n", qp.Question))
+
+			blocks, err := b.blockRepo.GetByQAPairID(ctx, qp.ID)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("thread degraded: qa_pair %s blocks unavailable: %v", qp.ID, err))
+				sb.WriteString("**A:** [answer omitted due to context degradation]\n\n")
+				continue
+			}
+
+			if len(blocks) == 0 {
+				sb.WriteString("**A:** [no answer blocks]\n\n")
+				continue
+			}
+
+			for _, block := range blocks {
+				sb.WriteString(fmt.Sprintf("**A:** %s\n", block.Content))
+			}
+			sb.WriteString("\n")
+		}
+	}
+
+	return strings.TrimSpace(sb.String()), warnings
+}
+
+func (b *contextBuilder) collectAnchorEvidence(ctx context.Context, currentNode *entity.Node, nodeMap map[string]*entity.Node) (string, []string) {
+	if currentNode.AnchorID == nil {
+		return "", nil
+	}
+
+	anchor, err := b.anchorRepo.GetByID(ctx, *currentNode.AnchorID)
+	if err != nil {
+		return fmt.Sprintf("- Anchor ID: %s\n- Status: unavailable due to context degradation", *currentNode.AnchorID), []string{
+			fmt.Sprintf("anchor evidence degraded: anchor %s unavailable: %v", *currentNode.AnchorID, err),
+		}
+	}
+
+	lines := make([]string, 0, 3)
+	if sourceNode, ok := nodeMap[anchor.SourceNodeID]; ok {
+		lines = append(lines, fmt.Sprintf("- Source Node: %s", sourceNode.Question))
+	} else {
+		lines = append(lines, fmt.Sprintf("- Source Node ID: %s", anchor.SourceNodeID))
+	}
+	lines = append(lines, fmt.Sprintf("- Quoted Text: %s", anchor.QuotedText))
+	lines = append(lines, fmt.Sprintf("- Offsets: %d-%d", anchor.StartOffset, anchor.EndOffset))
+
+	return strings.Join(lines, "\n"), nil
+}
+
+func (b *contextBuilder) collectSummarySections(ctx context.Context, currentNodeID string, question string) (string, string, []string) {
+	warnings := make([]string, 0)
+
+	nodeSummary, err := b.summaryProvider.GetNodeSummary(ctx, currentNodeID)
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("summary degraded: node summary unavailable: %v", err))
+	}
+
+	siblingSummaries, err := b.summaryProvider.GetSiblingSummaries(ctx, currentNodeID)
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("summary degraded: sibling summaries unavailable: %v", err))
+	}
+
+	relevantSummaries, err := b.summaryProvider.GetRelevantSummaries(ctx, currentNodeID, question)
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("summary degraded: relevant summaries unavailable: %v", err))
+	}
+
+	if strings.TrimSpace(nodeSummary) != "" {
+		relevantSummaries = append([]string{"Current Node Summary: " + strings.TrimSpace(nodeSummary)}, relevantSummaries...)
+	}
+
+	return formatSummaryList(siblingSummaries), formatSummaryList(relevantSummaries), warnings
+}
+
+func formatSummaryList(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+
+	lines := make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		lines = append(lines, "- "+item)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (b *contextBuilder) selectSections(sections []contextSection) []contextSection {
+	selected := make([]contextSection, 0, len(sections))
+	for _, section := range sections {
+		if strings.TrimSpace(section.content) == "" {
+			continue
+		}
+		selected = append(selected, section)
+	}
+
+	sort.Slice(selected, func(i, j int) bool {
+		return selected[i].priority < selected[j].priority
+	})
+
+	return selected
+}
+
+func (b *contextBuilder) formatSystemPrompt() string {
+	return strings.TrimSpace(`
+你是一个知识探索助手，正在帮助用户在一棵“思维树”上逐步深化问题。
+
+回答时请遵循以下原则：
+1. 先理解整棵树当前要解决的目标，再回答当前问题。
+2. 如果提供了 anchor evidence，要把它视为当前问题的直接语义证据。
+3. 优先围绕当前节点与当前路径给出清晰、结构化的回答。
+4. 使用 Markdown 输出，并适当提示用户下一步可以继续深入的方向。`)
+}
+
+func (b *contextBuilder) formatUserPrompt(sections []contextSection) string {
+	var sb strings.Builder
+
+	for idx, section := range sections {
+		if idx > 0 {
+			sb.WriteString("\n\n")
+		}
+		sb.WriteString("## ")
+		sb.WriteString(section.title)
+		sb.WriteString("\n\n")
+		sb.WriteString(strings.TrimSpace(section.content))
+	}
+
+	return sb.String()
+}
+
+func (b *contextBuilder) buildThread(nodeMap map[string]*entity.Node, currentNodeID string) ([]*entity.Node, error) {
 	var thread []*entity.Node
 	id := currentNodeID
+
 	for {
 		node, ok := nodeMap[id]
 		if !ok {
-			break
+			if len(thread) == 0 {
+				return nil, fmt.Errorf("current node %s not found in tree", currentNodeID)
+			}
+			return nil, fmt.Errorf("broken parent chain at node %s", id)
 		}
+
 		thread = append([]*entity.Node{node}, thread...)
 		if node.ParentNodeID == nil {
-			break
+			return thread, nil
 		}
+
 		id = *node.ParentNodeID
 	}
-	return thread
 }
 
 func (b *contextBuilder) renderTreeOverview(sb *strings.Builder, node *entity.Node, childrenMap map[string][]*entity.Node, depth int, currentID string) {
 	indent := strings.Repeat("  ", depth)
 	marker := ""
 	if node.ID == currentID {
-		marker = " ← 当前节点"
+		marker = " <- current"
 	}
+
 	sb.WriteString(fmt.Sprintf("%s- %s [%s]%s\n", indent, node.Question, node.Status, marker))
 
 	for _, child := range childrenMap[node.ID] {

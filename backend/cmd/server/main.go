@@ -52,7 +52,7 @@ func main() {
 	nodeSvc := appservice.NewNodeService(nodeRepo, qaPairRepo, blockRepo, anchorRepo)
 
 	aiClient := ai.NewOpenAIClient(cfg.AI)
-	contextBuilder := ai.NewContextBuilder(nodeRepo, qaPairRepo, blockRepo)
+	contextBuilder := ai.NewContextBuilder(treeRepo, nodeRepo, qaPairRepo, blockRepo, anchorRepo)
 	chatSvc := appservice.NewChatService(nodeRepo, qaPairRepo, blockRepo, contextBuilder, aiClient)
 
 	r := router.Setup(router.Deps{

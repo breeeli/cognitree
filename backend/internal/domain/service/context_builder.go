@@ -5,6 +5,8 @@ import "context"
 type ContextPayload struct {
 	SystemPrompt string
 	UserPrompt   string
+	Degraded     bool
+	Warnings     []string
 }
 
 type ContextBuilder interface {

@@ -8,6 +8,7 @@ import (
 	"github.com/cognitree/backend/internal/domain/entity"
 	"github.com/cognitree/backend/internal/domain/repository"
 	domainservice "github.com/cognitree/backend/internal/domain/service"
+	"github.com/cognitree/backend/pkg/logger"
 )
 
 type AIClient interface {
@@ -47,6 +48,13 @@ func (s *ChatService) Chat(ctx context.Context, nodeID string, req dto.ChatReque
 	payload, err := s.contextBuilder.BuildContext(ctx, node.TreeID, nodeID, req.Question)
 	if err != nil {
 		return nil, fmt.Errorf("build context: %w", err)
+	}
+	if payload.Degraded && logger.L != nil {
+		logger.L.Warnw("context built with degradation",
+			"node_id", nodeID,
+			"tree_id", node.TreeID,
+			"warnings", payload.Warnings,
+		)
 	}
 
 	answer, err := s.aiClient.Chat(ctx, payload.SystemPrompt, payload.UserPrompt)

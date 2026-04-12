@@ -53,7 +53,7 @@ type chatResponse struct {
 
 func (c *OpenAIClient) Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	if c.apiKey == "" {
-		return c.mockChat(userPrompt), nil
+		return c.mockChat(systemPrompt, userPrompt), nil
 	}
 
 	messages := []chatMessage{
@@ -110,12 +110,17 @@ func (c *OpenAIClient) Chat(ctx context.Context, systemPrompt, userPrompt string
 	return chatResp.Choices[0].Message.Content, nil
 }
 
-func (c *OpenAIClient) mockChat(userPrompt string) string {
-	return fmt.Sprintf("**[Mock 模式]** AI API Key 未配置，以下为模拟回答。\n\n"+
-		"你的问题涉及一个很好的方向。让我从几个角度来分析：\n\n"+
-		"1. **核心概念**：这个问题的核心在于理解其基本原理和应用场景\n"+
-		"2. **深入分析**：从技术角度看，有多个因素需要考虑\n"+
-		"3. **实践建议**：建议从简单的场景开始，逐步深入\n\n"+
-		"> 提示：请在 `config.yaml` 中配置 `ai.api_key` 以获得真实的 AI 回答。\n\n"+
-		"---\n*收到的问题：%s*", userPrompt)
+func (c *OpenAIClient) mockChat(systemPrompt, userPrompt string) string {
+	return fmt.Sprintf(
+		"**[Mock Mode]** AI API Key is not configured.\n\n"+
+			"**System Prompt**:\n%s\n\n"+
+			"Your question looks promising. Here is a lightweight simulated response:\n\n"+
+			"1. **Core idea**: understand the tree goal before answering the current ask.\n"+
+			"2. **Deeper angle**: preserve anchor evidence so branch intent stays clear.\n"+
+			"3. **Practical advice**: start from the current path, then expand only if needed.\n\n"+
+			"> Tip: configure `ai.api_key` in `config.yaml` to get real model output.\n\n"+
+			"---\n*Received question: %s*",
+		systemPrompt,
+		userPrompt,
+	)
 }
