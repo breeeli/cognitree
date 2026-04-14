@@ -23,6 +23,7 @@ export interface QAPair {
   question: string;
   blocks: Block[];
   created_at: string;
+  status?: "pending" | "complete" | "error";
 }
 
 export interface Block {
