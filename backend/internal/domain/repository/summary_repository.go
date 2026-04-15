@@ -9,6 +9,7 @@ import (
 )
 
 var ErrSummaryAlreadyExists = errors.New("summary already exists")
+var ErrSummaryNotFound = errors.New("summary not found")
 
 type SummaryRepository interface {
 	Create(ctx context.Context, summary *entity.Summary) error

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Tree, Node } from "@/types/tree";
-import { listTrees, getTree, createTree } from "@/api/trees";
+import { listTrees, getTree } from "@/api/trees";
 import { getNode } from "@/api/nodes";
 import { LeftPanel } from "@/components/sidebar/LeftPanel";
 import { WorkspacePanel } from "@/components/workspace/WorkspacePanel";
@@ -67,19 +67,15 @@ export function TreePage() {
     void loadNodeDetail(nodeId);
   };
 
-  const handleCreateTree = async (title: string, question: string) => {
-    const res = await createTree(title, question);
-    if (res.ok) {
-      setTrees((prev) => [res.data.tree, ...prev]);
-      void loadTree(res.data.tree.id);
-    }
-  };
-
   const handleNodeUpdated = () => {
     if (currentTreeId) {
       getTree(currentTreeId).then((res) => {
         if (res.ok) setTreeNodes(res.data.nodes);
       });
+    }
+
+    if (selectedNodeId) {
+      void loadNodeDetail(selectedNodeId);
     }
   };
 
@@ -98,7 +94,6 @@ export function TreePage() {
           selectedNodeId={selectedNodeId}
           onSelectNode={handleSelectNode}
           onSelectTree={loadTree}
-          onCreateTree={handleCreateTree}
         />
       </div>
 

@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cognitree/backend/internal/domain/entity"
@@ -43,6 +44,9 @@ func (p repositorySummaryProvider) GetSubtreeSummary(ctx context.Context, nodeID
 func (p repositorySummaryProvider) getSummary(ctx context.Context, scope entity.SummaryScope, nodeID string) (string, bool, error) {
 	summary, err := p.summaryRepo.GetLatestByScopeAndTarget(ctx, scope, nodeID)
 	if err != nil {
+		if errors.Is(err, repository.ErrSummaryNotFound) {
+			return "", false, nil
+		}
 		return "", false, fmt.Errorf("%s summary unavailable: %w", scope, err)
 	}
 	if summary.Status != entity.SummaryStatusReady {

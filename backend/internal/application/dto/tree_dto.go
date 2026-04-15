@@ -3,7 +3,7 @@ package dto
 import "time"
 
 type CreateTreeRequest struct {
-	Title    string `json:"title" binding:"required"`
+	Title    string `json:"title,omitempty"`
 	Question string `json:"question" binding:"required"`
 }
 

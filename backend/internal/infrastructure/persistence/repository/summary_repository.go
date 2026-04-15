@@ -63,11 +63,15 @@ func (r *summaryRepository) GetByID(ctx context.Context, id string) (*entity.Sum
 
 func (r *summaryRepository) GetLatestByScopeAndTarget(ctx context.Context, scope entity.SummaryScope, targetNodeID string) (*entity.Summary, error) {
 	var m model.Summary
-	if err := r.db.WithContext(ctx).
+	tx := r.db.WithContext(ctx).
 		Where("scope = ? AND target_node_id = ?", string(scope), targetNodeID).
 		Order("version DESC, created_at DESC").
-		First(&m).Error; err != nil {
-		return nil, fmt.Errorf("get latest summary: %w", err)
+		Find(&m)
+	if tx.Error != nil {
+		return nil, fmt.Errorf("get latest summary: %w", tx.Error)
+	}
+	if tx.RowsAffected == 0 {
+		return nil, domainrepo.ErrSummaryNotFound
 	}
 	return toSummaryEntity(&m), nil
 }

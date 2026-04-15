@@ -9,8 +9,8 @@ export function getTree(id: string) {
   return apiGet<TreeDetail>(`/trees/${id}`);
 }
 
-export function createTree(title: string, question: string) {
-  return apiPost<CreateTreeResponse>("/trees", { title, question });
+export function createTree(question: string) {
+  return apiPost<CreateTreeResponse>("/trees", { question });
 }
 
 export function deleteTree(id: string) {

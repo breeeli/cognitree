@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cognitree/backend/internal/application/dto"
 	"github.com/cognitree/backend/internal/domain/entity"
@@ -19,8 +20,13 @@ func NewTreeService(treeRepo repository.TreeRepository, nodeRepo repository.Node
 }
 
 func (s *TreeService) Create(ctx context.Context, req dto.CreateTreeRequest) (*dto.CreateTreeResponse, error) {
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = deriveTreeTitle(req.Question)
+	}
+
 	tree := &entity.Tree{
-		Title: req.Title,
+		Title: title,
 	}
 	if err := s.treeRepo.Create(ctx, tree); err != nil {
 		return nil, fmt.Errorf("create tree: %w", err)
@@ -94,6 +100,20 @@ func toTreeResponse(t *entity.Tree) dto.TreeResponse {
 		CreatedAt:   t.CreatedAt,
 		UpdatedAt:   t.UpdatedAt,
 	}
+}
+
+func deriveTreeTitle(question string) string {
+	trimmed := strings.TrimSpace(question)
+	if trimmed == "" {
+		return "Untitled tree"
+	}
+
+	runes := []rune(trimmed)
+	if len(runes) <= 24 {
+		return trimmed
+	}
+
+	return strings.TrimSpace(string(runes[:24])) + "…"
 }
 
 func toNodeResponse(n *entity.Node) dto.NodeResponse {
