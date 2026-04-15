@@ -7,3 +7,9 @@ type ChatRequest struct {
 type ChatResponse struct {
 	QAPair QAPairResponse `json:"qa_pair"`
 }
+
+type ChatStreamEvent struct {
+	Type    string `json:"type"`
+	Delta   string `json:"delta,omitempty"`
+	Message string `json:"message,omitempty"`
+}

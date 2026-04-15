@@ -57,13 +57,15 @@ func main() {
 	contextBuilder := ai.NewContextBuilder(treeRepo, nodeRepo, qaPairRepo, blockRepo, anchorRepo, summaryRepo)
 	summarySvc := appservice.NewSummaryService(treeRepo, nodeRepo, qaPairRepo, blockRepo, summaryRepo, aiClient)
 	summarySvc.Start(context.Background())
+	treeStreamSvc := appservice.NewTreeStreamService(treeRepo, nodeRepo, qaPairRepo, blockRepo, contextBuilder, aiClient, summarySvc)
 	chatSvc := appservice.NewChatService(nodeRepo, qaPairRepo, blockRepo, contextBuilder, aiClient, summarySvc)
 
 	r := router.Setup(router.Deps{
-		DB:      db,
-		TreeSvc: treeSvc,
-		NodeSvc: nodeSvc,
-		ChatSvc: chatSvc,
+		DB:            db,
+		TreeSvc:       treeSvc,
+		TreeStreamSvc: treeStreamSvc,
+		NodeSvc:       nodeSvc,
+		ChatSvc:       chatSvc,
 	})
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)

@@ -11,16 +11,19 @@ import (
 	"github.com/cognitree/backend/pkg/logger"
 )
 
-type AIClient interface {
+type ChatClient interface {
 	Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+	ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string) error) error
 }
+
+type AIClient = ChatClient
 
 type ChatService struct {
 	nodeRepo          repository.NodeRepository
 	qaPairRepo        repository.QAPairRepository
 	blockRepo         repository.BlockRepository
 	contextBuilder    domainservice.ContextBuilder
-	aiClient          AIClient
+	aiClient          ChatClient
 	summaryDispatcher SummaryDispatcher
 }
 
@@ -29,7 +32,7 @@ func NewChatService(
 	qaPairRepo repository.QAPairRepository,
 	blockRepo repository.BlockRepository,
 	contextBuilder domainservice.ContextBuilder,
-	aiClient AIClient,
+	aiClient ChatClient,
 	summaryDispatcher SummaryDispatcher,
 ) *ChatService {
 	return &ChatService{
@@ -65,9 +68,57 @@ func (s *ChatService) Chat(ctx context.Context, nodeID string, req dto.ChatReque
 		return nil, fmt.Errorf("ai chat: %w", err)
 	}
 
+	return s.persistChatAnswer(ctx, node, req.Question, answer)
+}
+
+func (s *ChatService) StreamChat(
+	ctx context.Context,
+	nodeID string,
+	req dto.ChatRequest,
+	emit func(dto.ChatStreamEvent) error,
+) error {
+	node, err := s.nodeRepo.GetByID(ctx, nodeID)
+	if err != nil {
+		return fmt.Errorf("get node: %w", err)
+	}
+
+	payload, err := s.contextBuilder.BuildContext(ctx, node.TreeID, nodeID, req.Question)
+	if err != nil {
+		return fmt.Errorf("build context: %w", err)
+	}
+	if payload.Degraded && logger.L != nil {
+		logger.L.Warnw("context built with degradation",
+			"node_id", nodeID,
+			"tree_id", node.TreeID,
+			"warnings", payload.Warnings,
+		)
+	}
+
+	var answer string
+	if err := s.aiClient.ChatStream(ctx, payload.SystemPrompt, payload.UserPrompt, func(delta string) error {
+		answer += delta
+		return emit(dto.ChatStreamEvent{Type: "answer_delta", Delta: delta})
+	}); err != nil {
+		_ = emit(dto.ChatStreamEvent{Type: "error", Message: err.Error()})
+		return fmt.Errorf("ai chat stream: %w", err)
+	}
+
+	if _, err := s.persistChatAnswer(ctx, node, req.Question, answer); err != nil {
+		_ = emit(dto.ChatStreamEvent{Type: "error", Message: err.Error()})
+		return err
+	}
+
+	if err := emit(dto.ChatStreamEvent{Type: "completed"}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *ChatService) persistChatAnswer(ctx context.Context, node *entity.Node, question, answer string) (*dto.ChatResponse, error) {
 	qaPair := &entity.QAPair{
-		NodeID:   nodeID,
-		Question: req.Question,
+		NodeID:   node.ID,
+		Question: question,
 	}
 	if err := s.qaPairRepo.Create(ctx, qaPair); err != nil {
 		return nil, fmt.Errorf("create qa_pair: %w", err)
@@ -90,7 +141,7 @@ func (s *ChatService) Chat(ctx context.Context, nodeID string, req dto.ChatReque
 	}
 
 	if s.summaryDispatcher != nil {
-		s.summaryDispatcher.EnqueueForNode(node.TreeID, nodeID)
+		s.summaryDispatcher.EnqueueForNode(node.TreeID, node.ID)
 	}
 
 	return &dto.ChatResponse{

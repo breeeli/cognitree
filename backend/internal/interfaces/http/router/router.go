@@ -9,10 +9,11 @@ import (
 )
 
 type Deps struct {
-	DB      *gorm.DB
-	TreeSvc *service.TreeService
-	NodeSvc *service.NodeService
-	ChatSvc *service.ChatService
+	DB            *gorm.DB
+	TreeSvc       *service.TreeService
+	TreeStreamSvc *service.TreeStreamService
+	NodeSvc       *service.NodeService
+	ChatSvc       *service.ChatService
 }
 
 func Setup(deps Deps) *gin.Engine {
@@ -21,14 +22,17 @@ func Setup(deps Deps) *gin.Engine {
 
 	healthHandler := handler.NewHealthHandler(deps.DB)
 	treeHandler := handler.NewTreeHandler(deps.TreeSvc)
+	treeStreamHandler := handler.NewTreeStreamHandler(deps.TreeStreamSvc)
 	nodeHandler := handler.NewNodeHandler(deps.NodeSvc)
 	chatHandler := handler.NewChatHandler(deps.ChatSvc)
+	chatStreamHandler := handler.NewChatStreamHandler(deps.ChatSvc)
 
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/health", healthHandler.Check)
 
 		v1.POST("/trees", treeHandler.Create)
+		v1.POST("/trees/stream", treeStreamHandler.Create)
 		v1.GET("/trees", treeHandler.List)
 		v1.GET("/trees/:id", treeHandler.GetByID)
 		v1.DELETE("/trees/:id", treeHandler.Delete)
@@ -42,6 +46,7 @@ func Setup(deps Deps) *gin.Engine {
 		v1.POST("/anchors", nodeHandler.CreateAnchor)
 
 		v1.POST("/nodes/:id/chat", chatHandler.Chat)
+		v1.POST("/nodes/:id/chat/stream", chatStreamHandler.Chat)
 	}
 
 	return r

@@ -13,7 +13,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:8089",
+        target: `http://localhost:${process.env.COGNITREE_SERVER_PORT ?? "8089"}`,
         changeOrigin: true,
       },
     },

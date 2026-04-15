@@ -146,6 +146,11 @@ func (f *fakeSummaryAI) Chat(_ context.Context, systemPrompt, userPrompt string)
 	return f.success, nil
 }
 
+func (f *fakeSummaryAI) ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string) error) error {
+	_, err := f.Chat(ctx, systemPrompt, userPrompt)
+	return err
+}
+
 type memorySummaryRepo struct {
 	mu        sync.Mutex
 	summaries map[string]*entity.Summary

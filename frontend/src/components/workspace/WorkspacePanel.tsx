@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Node, QAPair } from "@/types/tree";
+import type { Block, Node, QAPair } from "@/types/tree";
 import { AnswerView } from "./AnswerView";
 import { QuestionInput } from "./QuestionInput";
 import { QuotePopover } from "./QuotePopover";
 import { useTextSelection } from "@/hooks/useTextSelection";
-import { chatOnNode } from "@/api/chat";
+import { streamChatOnNode } from "@/api/chat";
 import { getNode, createAnchor } from "@/api/nodes";
 
 interface PendingAutoSubmit {
@@ -24,10 +24,17 @@ interface WorkspacePanelProps {
 type SubmitStatus = "pending" | "complete" | "error";
 
 function createPendingPair(question: string): QAPair & { status: SubmitStatus } {
+  const blockId = crypto.randomUUID();
   return {
     id: crypto.randomUUID(),
     question,
-    blocks: [],
+    blocks: [
+      {
+        id: blockId,
+        type: "paragraph" as Block["type"],
+        content: "",
+      },
+    ],
     created_at: new Date().toISOString(),
     status: "pending",
   };
@@ -123,21 +130,49 @@ export function WorkspacePanel({
       });
 
       try {
-        const res = await chatOnNode(nodeId, trimmed);
-        if (res.ok) {
-          setOptimisticPairs((prev) =>
-            prev.filter((pair) => pair.id !== pendingId),
-          );
-          if (currentNodeIdRef.current === nodeId) {
-            onNodeUpdated();
-          }
-        } else {
-          setOptimisticPairs((prev) =>
-            prev.map((pair) =>
-              pair.id === pendingId ? { ...pair, status: "error" } : pair,
-            ),
-          );
-        }
+        await streamChatOnNode(nodeId, { question: trimmed }, {
+          onDelta: (delta) => {
+            setOptimisticPairs((prev) =>
+              prev.map((pair) => {
+                if (pair.id !== pendingId) return pair;
+
+                const blocks = pair.blocks.length > 0
+                  ? pair.blocks.map((block, index) =>
+                      index === 0
+                        ? { ...block, content: block.content + delta }
+                        : block,
+                    )
+                  : [
+                      {
+                        id: crypto.randomUUID(),
+                        type: "paragraph" as Block["type"],
+                        content: delta,
+                      },
+                    ];
+
+                return {
+                  ...pair,
+                  blocks,
+                };
+              }),
+            );
+          },
+          onCompleted: () => {
+            setOptimisticPairs((prev) =>
+              prev.filter((pair) => pair.id !== pendingId),
+            );
+            if (currentNodeIdRef.current === nodeId) {
+              onNodeUpdated();
+            }
+          },
+          onError: () => {
+            setOptimisticPairs((prev) =>
+              prev.map((pair) =>
+                pair.id === pendingId ? { ...pair, status: "error" } : pair,
+              ),
+            );
+          },
+        });
       } catch {
         setOptimisticPairs((prev) =>
           prev.map((pair) =>
