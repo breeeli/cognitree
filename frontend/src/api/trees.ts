@@ -1,6 +1,12 @@
 import { apiDelete, apiGet, apiPost } from "./client";
 import { postEventStream } from "./stream";
-import type { Node, Tree, TreeDetail, CreateTreeResponse } from "@/types/tree";
+import type {
+  Node,
+  QAPair,
+  Tree,
+  TreeDetail,
+  CreateTreeResponse,
+} from "@/types/tree";
 
 export function listTrees() {
   return apiGet<Tree[]>("/trees");
@@ -28,6 +34,7 @@ export interface CreateTreeStreamHandlers {
   onTreeReady?: (tree: Tree) => void;
   onRootNodeReady?: (rootNode: Node) => void;
   onDelta?: (delta: string) => void;
+  onQAPairReady?: (qaPair: QAPair) => void;
   onCompleted?: () => void;
   onError?: (message: string) => void;
 }
@@ -36,6 +43,7 @@ interface TreeStreamEvent {
   type: string;
   tree?: Tree;
   root_node?: Node;
+  qa_pair?: QAPair;
   delta?: string;
   message?: string;
 }
@@ -55,6 +63,9 @@ export async function streamCreateTreeFirstQuestion(
           break;
         case "answer_delta":
           if (event.delta) handlers.onDelta?.(event.delta);
+          break;
+        case "qa_pair_ready":
+          if (event.qa_pair) handlers.onQAPairReady?.(event.qa_pair);
           break;
         case "error":
           handlers.onError?.(event.message ?? "stream error");

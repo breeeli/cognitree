@@ -1,6 +1,6 @@
 import { apiPost } from "./client";
 import { postEventStream } from "./stream";
-import type { ChatResponse } from "@/types/tree";
+import type { ChatResponse, QAPair } from "@/types/tree";
 
 export function chatOnNode(nodeId: string, question: string) {
   return apiPost<ChatResponse>(`/nodes/${nodeId}/chat`, { question });
@@ -12,12 +12,14 @@ export interface ChatStreamInput {
 
 export interface ChatStreamHandlers {
   onDelta?: (delta: string) => void;
+  onQAPairReady?: (qaPair: QAPair) => void;
   onCompleted?: () => void;
   onError?: (message: string) => void;
 }
 
 interface ChatStreamEvent {
   type: string;
+  qa_pair?: QAPair;
   delta?: string;
   message?: string;
 }
@@ -32,6 +34,9 @@ export async function streamChatOnNode(
       switch (event.type) {
         case "answer_delta":
           if (event.delta) handlers.onDelta?.(event.delta);
+          break;
+        case "qa_pair_ready":
+          if (event.qa_pair) handlers.onQAPairReady?.(event.qa_pair);
           break;
         case "error":
           handlers.onError?.(event.message ?? "stream error");

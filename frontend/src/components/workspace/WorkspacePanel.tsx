@@ -14,8 +14,8 @@ interface PendingAutoSubmit {
 
 interface WorkspacePanelProps {
   node: Node | null;
-  onNodeUpdated: () => void;
-  onNavigateToNode?: (nodeId: string) => void;
+  onNodeUpdated: (targetNodeId?: string) => Promise<void> | void;
+  onNavigateToNode?: (nodeId: string, nextNode?: Node) => void;
   onRequestAutoSubmit?: (payload: PendingAutoSubmit) => void;
   pendingAutoSubmit?: PendingAutoSubmit | null;
   onPendingAutoSubmitConsumed?: () => void;
@@ -43,6 +43,31 @@ function createPendingPair(question: string): QAPair & { status: SubmitStatus } 
 interface OptimisticPair extends QAPair {
   status?: SubmitStatus;
   nodeId: string;
+  pendingId: string;
+}
+
+function getPairSignature(pair: Pick<QAPair, "question" | "blocks">) {
+  return JSON.stringify({
+    question: pair.question.trim(),
+    content: pair.blocks.map((block) => block.content).join("\n"),
+  });
+}
+
+function mergeQAPairs(existing: QAPair[], incoming: QAPair[]) {
+  const merged = [...existing];
+  const indexById = new Map(existing.map((pair, index) => [pair.id, index]));
+
+  for (const pair of incoming) {
+    const index = indexById.get(pair.id);
+    if (index === undefined) {
+      indexById.set(pair.id, merged.length);
+      merged.push(pair);
+    } else {
+      merged[index] = pair;
+    }
+  }
+
+  return merged;
 }
 
 export function WorkspacePanel({
@@ -53,11 +78,13 @@ export function WorkspacePanel({
   pendingAutoSubmit,
   onPendingAutoSubmitConsumed,
 }: WorkspacePanelProps) {
+  const nodeId = node?.id ?? null;
   const [qaPairs, setQaPairs] = useState<QAPair[]>([]);
   const [optimisticPairs, setOptimisticPairs] = useState<OptimisticPair[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(false);
+  const isProgrammaticScrollRef = useRef(false);
   const { selection, clearSelection, lockSelection } = useTextSelection(
     "[data-answer-content]",
   );
@@ -76,17 +103,44 @@ export function WorkspacePanel({
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
+    isProgrammaticScrollRef.current = true;
     el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      isProgrammaticScrollRef.current = false;
+    });
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el || isProgrammaticScrollRef.current) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 80;
   }, []);
 
   const loadNodeDetail = useCallback(async (nodeId: string) => {
     const res = await getNode(nodeId);
     if (res.ok) {
-      setQaPairs(
-        (res.data.qa_pairs ?? []).map((pair) => ({
-          ...pair,
-          status: pair.status ?? "complete",
-        })),
+      if (currentNodeIdRef.current !== nodeId) return;
+
+      const incoming = (res.data.qa_pairs ?? []).map((pair) => ({
+        ...pair,
+        status: pair.status ?? "complete",
+      }));
+
+      setQaPairs((prev) => mergeQAPairs(prev, incoming));
+      setOptimisticPairs((prev) =>
+        prev.filter((pair) => {
+          if (pair.nodeId !== nodeId) return true;
+          if (pair.status === "error") return true;
+
+          const pairSignature = getPairSignature(pair);
+          return !incoming.some(
+            (incomingPair) =>
+              incomingPair.id === pair.id ||
+              getPairSignature(incomingPair) === pairSignature,
+          );
+        }),
       );
     }
   }, []);
@@ -95,15 +149,17 @@ export function WorkspacePanel({
     let active = true;
 
     const syncNode = async () => {
-      if (!node) {
+      if (!nodeId) {
         setQaPairs([]);
         setOptimisticPairs([]);
         return;
       }
 
-      await loadNodeDetail(node.id);
+      setQaPairs([]);
+      setOptimisticPairs([]);
+
+      await loadNodeDetail(nodeId);
       if (!active) return;
-      if (currentNodeIdRef.current !== node.id) return;
     };
 
     void syncNode();
@@ -111,7 +167,7 @@ export function WorkspacePanel({
     return () => {
       active = false;
     };
-  }, [node?.id, loadNodeDetail]);
+  }, [nodeId, loadNodeDetail]);
 
   const submitQuestion = useCallback(
     async (nodeId: string, question: string, tempId?: string) => {
@@ -126,7 +182,7 @@ export function WorkspacePanel({
       setLoading(true);
       setOptimisticPairs((prev) => {
         if (prev.some((pair) => pair.id === pendingId)) return prev;
-        return [...prev, { ...pendingPair, nodeId }];
+        return [...prev, { ...pendingPair, nodeId, pendingId }];
       });
 
       try {
@@ -157,13 +213,38 @@ export function WorkspacePanel({
               }),
             );
           },
+          onQAPairReady: (qaPair) => {
+            setQaPairs((prev) => {
+              const existing = prev.filter((pair) => pair.id !== pendingId);
+              return mergeQAPairs(existing, [
+                {
+                  ...qaPair,
+                  status: "complete",
+                },
+              ]);
+            });
+            setOptimisticPairs((prev) =>
+              prev.filter((pair) => pair.pendingId !== pendingId),
+            );
+          },
           onCompleted: () => {
             setOptimisticPairs((prev) =>
-              prev.filter((pair) => pair.id !== pendingId),
+              prev.map((pair) =>
+                pair.pendingId === pendingId
+                  ? { ...pair, status: "complete" }
+                  : pair,
+              ),
             );
-            if (currentNodeIdRef.current === nodeId) {
-              onNodeUpdated();
-            }
+            Promise.resolve(onNodeUpdated?.(nodeId))
+              .catch(() => {
+                setOptimisticPairs((prev) =>
+                  prev.map((pair) =>
+                    pair.pendingId === pendingId
+                      ? { ...pair, status: "complete" }
+                      : pair,
+                  ),
+                );
+              });
           },
           onError: () => {
             setOptimisticPairs((prev) =>
@@ -197,7 +278,7 @@ export function WorkspacePanel({
     shouldAutoScrollRef.current = true;
     setOptimisticPairs((prev) => [
       ...prev,
-      { ...pendingPair, nodeId: node.id },
+      { ...pendingPair, nodeId: node.id, pendingId: pendingPair.id },
     ]);
     onPendingAutoSubmitConsumed?.();
     void submitQuestion(node.id, question, pendingPair.id);
@@ -218,7 +299,7 @@ export function WorkspacePanel({
     shouldAutoScrollRef.current = true;
     setOptimisticPairs((prev) => [
       ...prev,
-      { ...pendingPair, nodeId: node.id },
+      { ...pendingPair, nodeId: node.id, pendingId: pendingPair.id },
     ]);
     void submitQuestion(node.id, trimmed, pendingPair.id);
   };
@@ -240,23 +321,46 @@ export function WorkspacePanel({
 
     if (res.ok) {
       clearSelection();
-      onNodeUpdated();
+      onNavigateToNode?.(res.data.child_node.id, res.data.child_node);
+      void Promise.resolve(onNodeUpdated(res.data.child_node.id));
       onRequestAutoSubmit?.({
         nodeId: res.data.child_node.id,
         question: trimmed,
       });
-      onNavigateToNode?.(res.data.child_node.id);
     }
   };
 
-  const displayPairs = [
-    ...qaPairs,
-    ...optimisticPairs.filter((pair) => pair.nodeId === (node?.id ?? "")),
-  ];
+  const displayPairs = (() => {
+    const pairs = [
+      ...qaPairs,
+      ...optimisticPairs.filter((pair) => pair.nodeId === (nodeId ?? "")),
+    ];
+    const seenIds = new Set<string>();
+    const seenSignatures = new Set<string>();
+    return pairs.filter((pair) => {
+      const signature = getPairSignature(pair);
+      if (seenIds.has(pair.id) || seenSignatures.has(signature)) return false;
+
+      seenIds.add(pair.id);
+      seenSignatures.add(signature);
+      return true;
+    });
+  })();
   const hasPendingPair = displayPairs.some((pair) => pair.status === "pending");
 
   useEffect(() => {
-    if (!shouldAutoScrollRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isNearBottom = distanceFromBottom < 80;
+
+    if (!isNearBottom && hasPendingPair) {
+      shouldAutoScrollRef.current = false;
+      return;
+    }
+
+    if (!shouldAutoScrollRef.current && !isNearBottom) return;
 
     scrollToBottom();
 
@@ -290,7 +394,11 @@ export function WorkspacePanel({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto"
+        onScroll={handleScroll}
+      >
         <div className="max-w-3xl mx-auto px-8 py-6">
           <AnswerView qaPairs={displayPairs} />
         </div>

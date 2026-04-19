@@ -1,19 +1,19 @@
 import type { Components } from "react-markdown";
 
 export const markdownComponents: Components = {
-  p: ({ children }) => <p className="m-0 first:mt-0 mt-3">{children}</p>,
+  p: ({ children }) => <p className="m-0 mt-3 leading-7 first:mt-0">{children}</p>,
   h1: ({ children }) => (
-    <h1 className="text-lg font-semibold tracking-tight m-0 first:mt-0 mt-4">
+    <h1 className="m-0 mt-6 text-3xl font-bold tracking-tight text-foreground first:mt-0">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-base font-semibold tracking-tight m-0 first:mt-0 mt-4">
+    <h2 className="m-0 mt-5 text-2xl font-bold tracking-tight text-foreground first:mt-0">
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="text-sm font-semibold tracking-tight m-0 first:mt-0 mt-3">
+    <h3 className="m-0 mt-4 text-lg font-semibold tracking-tight text-foreground first:mt-0">
       {children}
     </h3>
   ),
@@ -27,7 +27,7 @@ export const markdownComponents: Components = {
   ),
   li: ({ children }) => <li className="m-0">{children}</li>,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-border pl-3 text-muted-foreground m-0 first:mt-0 mt-3">
+    <blockquote className="m-0 mt-4 border-l-4 border-primary/30 pl-4 italic text-muted-foreground first:mt-0">
       {children}
     </blockquote>
   ),
@@ -49,7 +49,7 @@ export const markdownComponents: Components = {
     );
   },
   pre: ({ children }) => (
-    <pre className="overflow-x-auto rounded-xl bg-muted/60 p-3 font-mono text-xs leading-6 m-0 first:mt-0 mt-3">
+    <pre className="m-0 mt-4 overflow-x-auto rounded-xl bg-muted/60 p-4 font-mono text-xs leading-6 first:mt-0">
       {children}
     </pre>
   ),

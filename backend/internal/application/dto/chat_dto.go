@@ -9,7 +9,8 @@ type ChatResponse struct {
 }
 
 type ChatStreamEvent struct {
-	Type    string `json:"type"`
-	Delta   string `json:"delta,omitempty"`
-	Message string `json:"message,omitempty"`
+	Type    string          `json:"type"`
+	QAPair  *QAPairResponse `json:"qa_pair,omitempty"`
+	Delta   string          `json:"delta,omitempty"`
+	Message string          `json:"message,omitempty"`
 }

@@ -108,6 +108,15 @@ func (s *ChatService) StreamChat(
 		return err
 	}
 
+	qaPairResponse, err := s.buildLatestQAPairResponse(ctx, node.ID)
+	if err != nil {
+		_ = emit(dto.ChatStreamEvent{Type: "error", Message: err.Error()})
+		return err
+	}
+	if err := emit(dto.ChatStreamEvent{Type: "qa_pair_ready", QAPair: qaPairResponse}); err != nil {
+		return err
+	}
+
 	if err := emit(dto.ChatStreamEvent{Type: "completed"}); err != nil {
 		return err
 	}
@@ -157,5 +166,37 @@ func (s *ChatService) persistChatAnswer(ctx context.Context, node *entity.Node, 
 				},
 			},
 		},
+	}, nil
+}
+
+func (s *ChatService) buildLatestQAPairResponse(ctx context.Context, nodeID string) (*dto.QAPairResponse, error) {
+	qaPairs, err := s.qaPairRepo.GetByNodeID(ctx, nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("get qa_pairs: %w", err)
+	}
+	if len(qaPairs) == 0 {
+		return nil, fmt.Errorf("qa_pair not found")
+	}
+
+	latest := qaPairs[len(qaPairs)-1]
+	blocks, err := s.blockRepo.GetByQAPairID(ctx, latest.ID)
+	if err != nil {
+		return nil, fmt.Errorf("get blocks: %w", err)
+	}
+
+	blockResponses := make([]dto.BlockResponse, len(blocks))
+	for i, block := range blocks {
+		blockResponses[i] = dto.BlockResponse{
+			ID:      block.ID,
+			Type:    string(block.Type),
+			Content: block.Content,
+		}
+	}
+
+	return &dto.QAPairResponse{
+		ID:        latest.ID,
+		Question:  latest.Question,
+		Blocks:    blockResponses,
+		CreatedAt: latest.CreatedAt,
 	}, nil
 }

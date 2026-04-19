@@ -62,14 +62,23 @@ func TestTreeStreamServiceCreatesTreeAndPersistsCompletedAnswer(t *testing.T) {
 	if nodeRepo.updated == nil || nodeRepo.updated.Status != entity.NodeStatusAnswered {
 		t.Fatalf("expected root node status to be answered, got %#v", nodeRepo.updated)
 	}
+	if len(qaPairRepo.created) == 0 {
+		t.Fatal("expected qa_pair to be created")
+	}
+	if got, want := qaPairRepo.created[0].ID, "qa-1"; got != want {
+		t.Fatalf("unexpected qa_pair id: got %q want %q", got, want)
+	}
 
 	types := make([]string, 0, len(events))
 	for _, event := range events {
 		types = append(types, event.Type)
 	}
 	gotTypes := strings.Join(types, ",")
-	if gotTypes != "tree_ready,root_node_ready,answer_delta,answer_delta,completed" {
+	if gotTypes != "tree_ready,root_node_ready,answer_delta,answer_delta,qa_pair_ready,completed" {
 		t.Fatalf("unexpected event sequence: %s", gotTypes)
+	}
+	if len(events) < 5 || events[len(events)-2].QAPair == nil {
+		t.Fatalf("expected qa_pair_ready event with payload, got %#v", events)
 	}
 }
 
@@ -219,13 +228,19 @@ func (r *streamQAPairRepo) Create(ctx context.Context, qaPair *entity.QAPair) er
 }
 
 func (r *streamQAPairRepo) GetByID(context.Context, string) (*entity.QAPair, error) {
-	return nil, nil
+	if len(r.created) == 0 {
+		return nil, errors.New("qa_pair not found")
+	}
+	return r.created[len(r.created)-1], nil
 }
 func (r *streamQAPairRepo) GetByNodeID(context.Context, string) ([]*entity.QAPair, error) {
-	return nil, nil
+	return r.created, nil
 }
 func (r *streamQAPairRepo) GetLatestByNodeID(context.Context, string) (*entity.QAPair, error) {
-	return nil, nil
+	if len(r.created) == 0 {
+		return nil, errors.New("qa_pair not found")
+	}
+	return r.created[len(r.created)-1], nil
 }
 func (r *streamQAPairRepo) DeleteByNodeID(context.Context, string) error { return nil }
 
@@ -247,7 +262,7 @@ func (r *streamBlockRepo) GetByID(context.Context, string) (*entity.Block, error
 	return nil, nil
 }
 func (r *streamBlockRepo) GetByQAPairID(context.Context, string) ([]*entity.Block, error) {
-	return nil, nil
+	return r.created, nil
 }
 func (r *streamBlockRepo) DeleteByQAPairID(context.Context, string) error { return nil }
 

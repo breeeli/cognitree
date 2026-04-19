@@ -48,13 +48,22 @@ func TestChatServiceStreamPersistsCompletedAnswer(t *testing.T) {
 	if got, want := blockRepo.created[0].Content, "Hello world"; got != want {
 		t.Fatalf("unexpected block content: got %q want %q", got, want)
 	}
+	if len(qaPairRepo.created) == 0 {
+		t.Fatal("expected qa_pair to be created")
+	}
+	if got, want := qaPairRepo.created[0].ID, "qa-1"; got != want {
+		t.Fatalf("unexpected qa_pair id: got %q want %q", got, want)
+	}
 
 	types := make([]string, 0, len(events))
 	for _, event := range events {
 		types = append(types, event.Type)
 	}
-	if got := strings.Join(types, ","); got != "answer_delta,answer_delta,completed" {
+	if got := strings.Join(types, ","); got != "answer_delta,answer_delta,qa_pair_ready,completed" {
 		t.Fatalf("unexpected event sequence: %s", got)
+	}
+	if len(events) < 3 || events[len(events)-2].QAPair == nil {
+		t.Fatalf("expected qa_pair_ready event with payload, got %#v", events)
 	}
 }
 
@@ -144,13 +153,19 @@ func (r *chatStreamQAPairRepo) Create(ctx context.Context, qaPair *entity.QAPair
 }
 
 func (r *chatStreamQAPairRepo) GetByID(context.Context, string) (*entity.QAPair, error) {
-	return nil, nil
+	if len(r.created) == 0 {
+		return nil, errors.New("qa_pair not found")
+	}
+	return r.created[len(r.created)-1], nil
 }
 func (r *chatStreamQAPairRepo) GetByNodeID(context.Context, string) ([]*entity.QAPair, error) {
-	return nil, nil
+	return r.created, nil
 }
 func (r *chatStreamQAPairRepo) GetLatestByNodeID(context.Context, string) (*entity.QAPair, error) {
-	return nil, nil
+	if len(r.created) == 0 {
+		return nil, errors.New("qa_pair not found")
+	}
+	return r.created[len(r.created)-1], nil
 }
 func (r *chatStreamQAPairRepo) DeleteByNodeID(context.Context, string) error { return nil }
 
@@ -172,7 +187,7 @@ func (r *chatStreamBlockRepo) GetByID(context.Context, string) (*entity.Block, e
 	return nil, nil
 }
 func (r *chatStreamBlockRepo) GetByQAPairID(context.Context, string) ([]*entity.Block, error) {
-	return nil, nil
+	return r.created, nil
 }
 func (r *chatStreamBlockRepo) DeleteByQAPairID(context.Context, string) error { return nil }
 

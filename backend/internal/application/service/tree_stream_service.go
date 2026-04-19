@@ -103,6 +103,15 @@ func (s *TreeStreamService) StreamFirstQuestion(
 		return fmt.Errorf("create block: %w", err)
 	}
 
+	qaPairResponse, err := s.buildLatestQAPairResponse(ctx, rootNode.ID)
+	if err != nil {
+		_ = emit(dto.TreeStreamEvent{Type: "error", Message: err.Error()})
+		return err
+	}
+	if err := emit(dto.TreeStreamEvent{Type: "qa_pair_ready", QAPair: qaPairResponse}); err != nil {
+		return err
+	}
+
 	if rootNode.Status == entity.NodeStatusDraft {
 		rootNode.Status = entity.NodeStatusAnswered
 		if err := s.nodeRepo.Update(ctx, rootNode); err != nil {
@@ -120,6 +129,38 @@ func (s *TreeStreamService) StreamFirstQuestion(
 	}
 
 	return nil
+}
+
+func (s *TreeStreamService) buildLatestQAPairResponse(ctx context.Context, nodeID string) (*dto.QAPairResponse, error) {
+	qaPairs, err := s.qaPairRepo.GetByNodeID(ctx, nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("get qa_pairs: %w", err)
+	}
+	if len(qaPairs) == 0 {
+		return nil, fmt.Errorf("qa_pair not found")
+	}
+
+	latest := qaPairs[len(qaPairs)-1]
+	blocks, err := s.blockRepo.GetByQAPairID(ctx, latest.ID)
+	if err != nil {
+		return nil, fmt.Errorf("get blocks: %w", err)
+	}
+
+	blockResponses := make([]dto.BlockResponse, len(blocks))
+	for i, block := range blocks {
+		blockResponses[i] = dto.BlockResponse{
+			ID:      block.ID,
+			Type:    string(block.Type),
+			Content: block.Content,
+		}
+	}
+
+	return &dto.QAPairResponse{
+		ID:        latest.ID,
+		Question:  latest.Question,
+		Blocks:    blockResponses,
+		CreatedAt: latest.CreatedAt,
+	}, nil
 }
 
 func (s *TreeStreamService) resolveTreeAndRoot(

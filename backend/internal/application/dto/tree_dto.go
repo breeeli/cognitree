@@ -27,11 +27,12 @@ type CreateTreeStreamRequest struct {
 }
 
 type TreeStreamEvent struct {
-	Type     string        `json:"type"`
-	Tree     *TreeResponse `json:"tree,omitempty"`
-	RootNode *NodeResponse `json:"root_node,omitempty"`
-	Delta    string        `json:"delta,omitempty"`
-	Message  string        `json:"message,omitempty"`
+	Type     string          `json:"type"`
+	Tree     *TreeResponse   `json:"tree,omitempty"`
+	RootNode *NodeResponse   `json:"root_node,omitempty"`
+	QAPair   *QAPairResponse `json:"qa_pair,omitempty"`
+	Delta    string          `json:"delta,omitempty"`
+	Message  string          `json:"message,omitempty"`
 }
 
 type TreeDetailResponse struct {

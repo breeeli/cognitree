@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import type { Tree, Node } from "@/types/tree";
 import { SidebarToolbar } from "./SidebarToolbar";
 import { TreePanel } from "../tree/TreePanel";
@@ -12,6 +11,7 @@ interface LeftPanelProps {
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onSelectTree: (treeId: string) => void;
+  onCreateNew: () => void;
 }
 
 export function LeftPanel({
@@ -22,16 +22,15 @@ export function LeftPanel({
   selectedNodeId,
   onSelectNode,
   onSelectTree,
+  onCreateNew,
 }: LeftPanelProps) {
-  const navigate = useNavigate();
-
   return (
     <div className="flex flex-col h-full bg-card border-r border-border">
       <SidebarToolbar
         trees={trees}
         currentTreeId={currentTreeId}
         onSelectTree={onSelectTree}
-        onCreateNew={() => navigate("/trees/new")}
+        onCreateNew={onCreateNew}
       />
 
       <div className="flex-1 min-h-0 overflow-hidden">
